@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">SMS Chat</string>
+
+    <!-- Home Activity -->
+    <string name="home_ui_empty">Welcome to SMSDiffusion!\nYou don\'t have any diffusions list now, click the "+" in the menu to get started.</string>
+    <string name="home_menu_add">Create new diffusion list</string>
+    <string name="home_menu_add_dialog">Enter the name of your new diffusion list</string>
+    <string name="home_remove_message">Delete this list ?</string>
+    <string name="home_remove_confirm">OK</string>
+    <string name="home_default_list_name">MyRoom</string>
+
+    <!-- Diffusion keyword fragment -->
+    <string name="diffusion_keyword_title">Keywords</string>
+    <string name="diffusion_keyword_ui_empty">Add a keyword to monitor.</string>
+    <string name="diffusion_keyword_ui_hint">Enter keyword</string>
+    <string name="diffusion_keyword_remove_message">Delete this keyword ?</string>
+    <string name="diffusion_keyword_remove_confirm">OK</string>
+
+    <!-- Diffusion contact fragment -->
+    <string name="diffusion_contact_title">Contacts</string>
+    <string name="diffusion_contact_ui_empty">Add a contact to the list</string>
+    <string name="diffusion_contact_ui_hint">Enter contact info</string>
+    <string name="diffusion_contact_ui_contentdescription">Save contact</string>
+    <string name="diffusion_contact_remove_message">Delete this contact ?</string>
+    <string name="diffusion_contact_remove_confirm">OK</string>
+    
+    <!-- Diffusion list fragment -->
+    <string name="diffusion_list_title">List Settings</string>
+	<string name="diffusion_list_textHint">List name</string>
+	<string name="diffusion_list_titleSetting">List settings</string>
+	<string name="diffusion_list_titleInfos">About this list</string>
+	<string name="diffusion_list_textInfos">Add keywords to monitor using the "keyword" tab. Any incoming messages matching this keywords will be automatically forwarded to the contacts you selected in "contacts" tabs.</string>
+    <string name="diffusion_list_textEnable">Enable this list</string>
+    <string name="diffusion_list_textEnableHelp">Define whether sms matching this list keyword should be forwarded.</string>
+    <string name="diffusion_list_textInfos_full">This list forwarded %1$d messages to %2$d contacts. \nLast message was sent on %3$s: \n"%4$s"</string>
+    <string name="diffusion_list_textInfos_semi">This list forwarded %1$d messages to %2$d contacts.</string>
+</resources>

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="5dp" >
+
+    <EditText
+        android:id="@+id/editName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentRight="true"
+        android:inputType="text"
+        android:digits="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ,_"
+        android:ems="10"
+        android:hint="@string/diffusion_list_textHint"
+        android:nextFocusLeft="@+id/editName"
+        android:nextFocusUp="@+id/editName" >
+    </EditText>
+
+    <TextView
+        android:id="@+id/titleSetting"
+        style="?android:attr/listSeparatorTextViewStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentRight="true"
+        android:layout_below="@id/editName"
+        android:layout_marginTop="5dp"
+        android:drawableLeft="@drawable/ic_settings"
+        android:drawablePadding="5dp"
+        android:padding="5dp"
+        android:text="@string/diffusion_list_titleSetting" />
+
+    <TextView
+        android:id="@+id/textEnable"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/titleSetting"
+        android:paddingTop="5dp"
+        android:text="@string/diffusion_list_textEnable"
+        android:textAppearance="?android:attr/textAppearanceLarge" />
+
+    <TextView
+        android:id="@+id/textEnableHelp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@+id/textEnable"
+        android:layout_alignParentRight="true"
+        android:layout_below="@+id/textEnable"
+        android:text="@string/diffusion_list_textEnableHelp"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+    <TextView
+        android:id="@+id/titleInfos"
+        style="?android:attr/listSeparatorTextViewStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentRight="true"
+        android:layout_below="@+id/textEnableHelp"
+        android:layout_marginTop="5dp"
+        android:drawableLeft="@drawable/ic_infos"
+        android:drawablePadding="5dp"
+        android:padding="5dp"
+        android:text="@string/diffusion_list_titleInfos" />
+
+    <TextView
+        android:id="@+id/infos"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_below="@+id/titleInfos"
+        android:paddingTop="5dp"
+        android:text="@string/diffusion_list_textInfos"
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
+</RelativeLayout>
