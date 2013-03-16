@@ -21,16 +21,42 @@ public class DBHelper {
 		return db.getReadableDatabase();
 	}
 
-	public static void insertContact(Context context, long room_id,
-			String phoneNumber) {
+	public static void insertContact(Context context, long room_id, String number, String nick, String parentBridge,
+			boolean use_app, boolean is_bridge) {
 		synchronized (DBHelper.sDataLock) {
 			SQLiteDatabase db = getDatabase(context);
 
 			ContentValues values = new ContentValues();
-			values.put("number", phoneNumber);
+			values.put("number", number);
 			values.put("room_id", room_id);
-			values.put("use_app", false);
+			values.put("is_bridge", is_bridge);
+			if(parentBridge != null){
+				values.put("parent_bridge", parentBridge);
+			}else {
+				values.putNull("parent_bridge");
+			}
+			values.put("use_app", use_app);
+			if(nick != null){
+				values.put("nick",nick);
+			}else {
+				values.putNull("nick");
+			}
+			db.insert("contacts", null, values);
+			db.close();
+		}
+	}
+	
+	public static void insertContactDefault(Context context, long room_id, String number) {
+		synchronized (DBHelper.sDataLock) {
+			SQLiteDatabase db = getDatabase(context);
+
+			ContentValues values = new ContentValues();
+			values.put("number", number);
+			values.put("room_id", room_id);
 			values.put("is_bridge", false);
+			values.putNull("parent_bridge");
+			values.put("use_app", false);
+			values.putNull("nick");
 			db.insert("contacts", null, values);
 			db.close();
 		}
@@ -102,7 +128,7 @@ public class DBHelper {
 			cursor.moveToFirst();
 			while (!cursor.isAfterLast()) {
 				boolean use_app = (cursor.getInt(2) == 1);
-				boolean is_bridge = (cursor.getInt(4) == 1);
+				boolean is_bridge = (cursor.getInt(3) == 1);
 				String nick = null;
 				if(!cursor.isNull(1)){
 					nick = cursor.getString(1);
@@ -114,6 +140,94 @@ public class DBHelper {
 			db.close();
 		}
 		return contacts;
+	}
+	
+	public static ArrayList<POJOContact> getContacts(Context context, long room_id) {
+
+		ArrayList<POJOContact> contacts = new ArrayList<POJOContact>();
+		synchronized (DBHelper.sDataLock) {
+			SQLiteDatabase db = getDatabase(context);
+
+			Cursor cursor = db.query(true, "contacts",
+					new String[] { "number, nick, use_app, is_bridge, parent_bridge" }, "room_id = ?", 
+					new String[]{String.valueOf(room_id)}, null, null, "_id DESC", null);
+
+			cursor.moveToFirst();
+			while (!cursor.isAfterLast()) {
+				boolean use_app = (cursor.getInt(2) == 1);
+				boolean is_bridge = (cursor.getInt(3) == 1);
+				String nick = null;
+				String parent_bridge = null;
+				if(!cursor.isNull(1)){
+					nick = cursor.getString(1);
+				}
+				if(!cursor.isNull(4)){
+					parent_bridge = cursor.getString(4);
+				}
+				contacts.add(new POJOContact(cursor.getString(0), nick, parent_bridge, use_app, is_bridge));
+				cursor.moveToNext();
+			}
+			cursor.close();
+			db.close();
+		}
+		return contacts;
+	}
+	
+	public static ArrayList<POJOContact> getBridges(Context context, long room_id) {
+
+		ArrayList<POJOContact> contacts = new ArrayList<POJOContact>();
+		synchronized (DBHelper.sDataLock) {
+			SQLiteDatabase db = getDatabase(context);
+
+			Cursor cursor = db.query(true, "contacts",
+					new String[] { "number, nick, use_app" }, "room_id = ? AND is_bridge = 1", 
+					new String[]{String.valueOf(room_id)}, null, null, "_id DESC", null);
+
+			cursor.moveToFirst();
+			while (!cursor.isAfterLast()) {
+				boolean use_app = (cursor.getInt(2) == 1);
+				boolean is_bridge = true;
+				String nick = null;
+				if(!cursor.isNull(1)){
+					nick = cursor.getString(1);
+				}
+				contacts.add(new POJOContact(cursor.getString(0), nick, null, use_app, is_bridge));
+				cursor.moveToNext();
+			}
+			cursor.close();
+			db.close();
+		}
+		return contacts;
+	}
+	
+	public static POJOContact getContact(Context context, long room_id,
+			String phoneNumber) {
+		POJOContact contact = null;
+		synchronized (DBHelper.sDataLock) {
+			SQLiteDatabase db = getDatabase(context);
+
+			Cursor cursor = db.query(true, "contacts",
+					new String[] { "number, nick, use_app, is_bridge" }, "room_id = ?", new String[]{String.valueOf(room_id)}, null, null,
+					"_id DESC", null);
+
+			boolean found = false;
+			cursor.moveToFirst();
+			while (!cursor.isAfterLast() && !found) {
+				if(PhoneNumberUtils.compare(phoneNumber, cursor.getString(0))){
+					boolean use_app = (cursor.getInt(2) == 1);
+					boolean is_bridge = (cursor.getInt(3) == 1);
+					String nick = null;
+					if(!cursor.isNull(1)){
+						nick = cursor.getString(1);
+					}
+					contact = new POJOContact(cursor.getString(0), nick, null, use_app, is_bridge);
+				}
+				cursor.moveToNext();
+			}
+			cursor.close();
+			db.close();
+		}
+		return contact;
 	}
 	
 	public static String getContactNick(Context context, String number, long room_id) {
@@ -165,30 +279,6 @@ public class DBHelper {
 		}
 		return rooms;
 	}
-	
-	/*public static ArrayList<POJORoom> getLocalRooms(Context context) {
-
-		ArrayList<POJORoom> rooms = new ArrayList<POJORoom>();
-		synchronized (DBHelper.sDataLock) {
-			SQLiteDatabase db = getDatabase(context);
-
-			Cursor cursor = db.query(true, "rooms", new String[] {
-					"_id", "name", "distant"}, "distant = ?", new String[]{String.valueOf(0)}, null, null,
-					"_id DESC", null);
-
-			cursor.moveToFirst();
-			while (!cursor.isAfterLast()) {
-				boolean distant = cursor.getInt(2) == 1;
-				POJORoom entry = new POJORoom(cursor.getLong(0),
-						cursor.getString(1), distant);
-				rooms.add(entry);
-				cursor.moveToNext();
-			}
-			cursor.close();
-			db.close();
-		}
-		return rooms;
-	}*/
 	
 	public static POJORoom getRoom(Context context, long room_id) {
 		POJORoom entry;
@@ -285,7 +375,54 @@ public class DBHelper {
 			cursor.close();
 			if(localNumber != null){
 				ContentValues values = new ContentValues();
-				values.put("nick",nick);
+				if(nick != null){
+					values.put("nick",nick);
+				}else {
+					values.putNull("nick");
+				}
+				db.update("contacts", values, "number = ? AND room_id = ?", new String[] { localNumber, String.valueOf(room_id) });
+			}
+			db.close();
+		}
+	}
+	
+	public static void updateContact(Context context, long room_id,
+			POJOContact contact) {
+		synchronized (DBHelper.sDataLock) {
+			SQLiteDatabase db = getDatabase(context);
+
+			Cursor cursor = db.query(true, "contacts",
+					new String[] { "number" }, "room_id = ?", new String[]{String.valueOf(room_id)}, null, null,
+					"_id DESC", null);
+
+			boolean found = false;
+			cursor.moveToFirst();
+			String localNumber = null;
+			while (!cursor.isAfterLast() && !found) {
+				if(PhoneNumberUtils.compare(contact.number, cursor.getString(0))){
+					found = true;
+					if(!cursor.isNull(1)){
+						localNumber = cursor.getString(0);
+					}
+				}
+				cursor.moveToNext();
+			}
+			cursor.close();
+			if(localNumber != null){
+				ContentValues values = new ContentValues();
+				values.put("is_bridge", contact.is_bridge);
+				values.put("number", contact.number);
+				if(contact.parentBridge != null){
+					values.put("parent_bridge", contact.parentBridge);
+				}else {
+					values.putNull("parent_bridge");
+				}
+				values.put("use_app", contact.use_app);
+				if(contact.nick != null){
+					values.put("nick",contact.nick);
+				}else {
+					values.putNull("nick");
+				}
 				db.update("contacts", values, "number = ? AND room_id = ?", new String[] { localNumber, String.valueOf(room_id) });
 			}
 			db.close();
@@ -298,7 +435,11 @@ public class DBHelper {
 			SQLiteDatabase db = getDatabase(context);
 
 			ContentValues values = new ContentValues();
-			values.put("parent_bridge",bridge);
+			if(bridge != null){
+				values.put("parent_bridge", bridge);
+			}else {
+				values.putNull("parent_bridge");
+			}
 			db.update("contacts", values, "number = ? AND room_id = ?", new String[] { phoneNumber, String.valueOf(room_id) });
 			db.close();
 		}

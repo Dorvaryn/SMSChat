@@ -118,7 +118,7 @@ public class ChatContactFragment extends ListFragment implements OnQuickActionLi
 				@Override
 				public void onItemClick(AdapterView<?> contactAdapter, View arg1, int position, long arg3) {
 					DisplayContact newContact = autoAdapter.getItem(position);
-					DBHelper.insertContact(getActivity(), mCallbacks.getListId(), newContact.phone);
+					DBHelper.insertContactDefault(getActivity(), mCallbacks.getListId(), newContact.phone);
 					((ArrayAdapter<DisplayContact>) getListAdapter()).add(newContact);
 					phoneNumber.setText("");
 					autoAdapter.remove(newContact);
@@ -133,7 +133,7 @@ public class ChatContactFragment extends ListFragment implements OnQuickActionLi
 					if (actionId == EditorInfo.IME_ACTION_DONE) {
 						if(!autoAdapter.isEmpty()){
 							DisplayContact newContact = autoAdapter.getItem(0);
-							DBHelper.insertContact(getActivity(), mCallbacks.getListId(), newContact.phone);
+							DBHelper.insertContactDefault(getActivity(), mCallbacks.getListId(), newContact.phone);
 							((ArrayAdapter<DisplayContact>) getListAdapter()).add(newContact);
 							phoneNumber.setText("");
 						}

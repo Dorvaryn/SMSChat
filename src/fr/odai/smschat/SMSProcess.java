@@ -1,9 +1,7 @@
 package fr.odai.smschat;
 
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -17,7 +15,6 @@ import android.telephony.SmsMessage;
 import android.util.Pair;
 import fr.odai.smschat.db.DBHelper;
 import fr.odai.smschat.model.POJOContact;
-import fr.odai.smschat.model.POJOMessage;
 import fr.odai.smschat.model.POJORoom;
 
 public class SMSProcess extends BroadcastReceiver {
@@ -36,60 +33,172 @@ public class SMSProcess extends BroadcastReceiver {
 					long time = msg.get(sender).first;
 
 					String[] content = body.split(" ", 2);
-					if(body.startsWith("#")){
-						processRoom(context, sender, content[0].substring(1), content[1], time);
-					}else if(body.startsWith("/")){
-						processCommand(context, sender, content[0].substring(1), content[1], time);
+					if (body.startsWith("#")) {
+						processRoom(context, sender, content[0].substring(1),
+								content[1], time);
+					} else if (body.startsWith("/")) {
+						processCommand(context, sender,
+								content[0].substring(1), content[1], time);
 					}
 				}
 			}
 		}
 	}
-	
-	private void processCommand(Context context, String sender, String command, String params, long time){
-		if(command.equalsIgnoreCase("/bridge")){
-			if(params.startsWith("#")){
+
+	private void processCommand(Context context, String sender, String command,
+			String params, long time) {
+		if (command.equalsIgnoreCase("/bridge")) {
+			if (params.startsWith("#")) {
 				String[] splited = params.split(" ", 3);
 				String roomName = splited[0].substring(1);
 				POJORoom room = DBHelper.getRoom(context, roomName);
 				String routedSender = splited[1].split(":")[0];
 				String newNick = splited[1].split(":")[1];
-				DBHelper.ChangeContactNick(context, room.getId(), routedSender, newNick);
+				DBHelper.ChangeContactNick(context, room.getId(), routedSender,
+						newNick);
 				processRoom(context, routedSender, roomName, splited[2], time);
+			} else if (params.startsWith("register")) {
+				String[] splited = params.split(" ", 2);
+				if (splited[0].startsWith("#")) {
+					String[] contacts = splited[1].split(";");
+					processRegister(context, sender, splited[0].substring(1), contacts);
+				}
+			} else if(params.startsWith("update")){
+				String[] splited = params.split(" ", 2);
+				if (splited[0].startsWith("#")) {
+					String[] contacts = splited[1].split(";");
+					processUpdate(context, sender, splited[0].substring(1), contacts);
+				}
 			}
 		}
 	}
 	
-	private void processRoom(Context context, String sender, String smsRoomName, String body, long time){
+	private void processUpdate(Context context, String sender,
+			String smsRoomName, String[] contacts) {
+
+		POJORoom room = DBHelper.getRoom(context, smsRoomName);
+		for (int i = 0; i < contacts.length; i++) {
+			String[] contactInfos = contacts[i].split(":");
+			POJOContact contact = DBHelper.getContact(context,
+					room.getId(), contactInfos[0]);
+			if (contactInfos[1].equalsIgnoreCase("bridge")) {
+				if (contact != null) {
+					contact.parentBridge = null;
+					contact.use_app = true;
+					contact.is_bridge = true;
+					DBHelper.updateContact(context, room.getId(), contact);
+				} else {
+					String nick = null;
+					if(!contactInfos[2].equalsIgnoreCase("")){
+						nick = contactInfos[2];
+					}
+					DBHelper.insertContact(context, room.getId(),
+							contactInfos[0], nick, null,
+							contactInfos[3].equalsIgnoreCase("1"), true);
+				}
+			} else {
+				if (contact != null) {
+					String parent = sender;
+					if(!contactInfos[1].equalsIgnoreCase("")){
+						parent = contactInfos[1];
+					}
+					contact.parentBridge = parent;
+				} else {
+					String nick = null;
+					if(!contactInfos[2].equalsIgnoreCase("")){
+						nick = contactInfos[2];
+					}
+					String parentBridge = sender;
+					if(!contactInfos[1].equalsIgnoreCase("")){
+						parentBridge = contactInfos[1];
+					}
+					DBHelper.insertContact(context, room.getId(),
+							contactInfos[0], nick, parentBridge,
+							contactInfos[3].equalsIgnoreCase("true"), false);
+				}
+			}
+		}
+	}
+
+	private void processRegister(Context context, String sender,
+			String smsRoomName, String[] contacts) {
+		
+		POJORoom room = DBHelper.getRoom(context, smsRoomName);
+		POJOContact newBridge = DBHelper.getContact(context, room.getId(),
+				sender);
+		newBridge.is_bridge = true;
+		newBridge.use_app = true;
+		newBridge.parentBridge = null;
+		DBHelper.updateContact(context, room.getId(), newBridge);
+		
+		processUpdate(context, sender, smsRoomName, contacts);
+		
+		ArrayList<POJOContact> contactsUpdated = DBHelper.getContacts(context, room.getId());
+		String infos = "";
+		for (POJOContact contactUpdated : contactsUpdated) {
+			String parentBridge = "";
+			if(!contactUpdated.is_bridge){
+				parentBridge = contactUpdated.parentBridge;
+			}else {
+				parentBridge = "bridge";
+			}
+			String nick = "";
+			if(contactUpdated.nick != null){
+				nick = contactUpdated.nick;
+			}
+			infos += contactUpdated.number + ":" + parentBridge + ":" + nick + ":" + Boolean.toString(contactUpdated.use_app);
+		}
+		
+		Iterator<POJOContact> it = DBHelper.getBridges(context,
+				room.getId()).iterator();
+		while (it.hasNext()) {
+			POJOContact bridge = (POJOContact) it.next();
+			SmsManager smsManager = SmsManager.getDefault();
+			String newBody = "/bridge update #" + room.name
+					+ " " + infos;
+			ArrayList<String> parts = smsManager
+					.divideMessage(newBody);
+			smsManager.sendMultipartTextMessage(bridge.number,
+					null, parts, null, null);
+		}
+	}
+
+	private void processRoom(Context context, String sender,
+			String smsRoomName, String body, long time) {
 		boolean found = false;
-		ArrayList<POJORoom> rooms = DBHelper
-				.getRooms(context);
+		ArrayList<POJORoom> rooms = DBHelper.getRooms(context);
 		Iterator<POJORoom> it = rooms.iterator();
 		while (it.hasNext() && !found) {
 			POJORoom room = it.next();
-			String nick = DBHelper.getContactNick(context, sender, room.getId());
-			
-			if(smsRoomName.equalsIgnoreCase(room.name)){
+			String nick = DBHelper
+					.getContactNick(context, sender, room.getId());
+
+			if (smsRoomName.equalsIgnoreCase(room.name)) {
 				found = true;
-				DBHelper.insertMessage(context, room.getId(), sender, body, time);
-				if(room.is_bridge){
-					for (POJOContact contact : DBHelper.getContactsToSend(context, room.getId())) {
+				DBHelper.insertMessage(context, room.getId(), sender, body,
+						time);
+				if (room.is_bridge) {
+					for (POJOContact contact : DBHelper.getContactsToSend(
+							context, room.getId())) {
 						if (!PhoneNumberUtils.compare(sender, contact.number)) {
 							SmsManager smsManager = SmsManager.getDefault();
 							String newBody = "";
-							if(contact.is_bridge){
-								newBody = "/bridge " + "#" + room.name + " " + sender + ":" + nick + " " + body;
-							}else {
+							if (contact.is_bridge) {
+								newBody = "/bridge " + "#" + room.name + " "
+										+ sender + ":" + nick + " " + body;
+							} else {
 								newBody = "#" + room.name + "\n";
-								if(!contact.use_app && (nick != null)){
+								if (!contact.use_app && (nick != null)) {
 									newBody += nick + " : ";
-								}else {
+								} else {
 									newBody += contact.number + " : ";
 								}
 								newBody += body;
 							}
-							ArrayList<String> parts = smsManager.divideMessage(newBody);
-							smsManager.sendMultipartTextMessage(contact.number, null, parts, null, null);
+							ArrayList<String> parts = smsManager
+									.divideMessage(newBody);
+							smsManager.sendMultipartTextMessage(contact.number,
+									null, parts, null, null);
 						}
 					}
 				}
@@ -97,7 +206,8 @@ public class SMSProcess extends BroadcastReceiver {
 		}
 	}
 
-	private static Map<String, Pair<Long, String>> RetrieveMessages(Intent intent) {
+	private static Map<String, Pair<Long, String>> RetrieveMessages(
+			Intent intent) {
 		Map<String, Pair<Long, String>> msg = null;
 		SmsMessage[] msgs = null;
 		Bundle bundle = intent.getExtras();
@@ -124,7 +234,9 @@ public class SMSProcess extends BroadcastReceiver {
 						// Save string into associative array with sender number
 						// as index
 						msg.put(msgs[i].getOriginatingAddress(),
-								new Pair<Long, String>(msgs[i].getTimestampMillis(), msgs[i].getMessageBody()));
+								new Pair<Long, String>(msgs[i]
+										.getTimestampMillis(), msgs[i]
+										.getMessageBody()));
 
 					} else {
 						// Number has been there, add content but consider that
