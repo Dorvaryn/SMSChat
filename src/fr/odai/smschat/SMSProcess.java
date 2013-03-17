@@ -47,16 +47,18 @@ public class SMSProcess extends BroadcastReceiver {
 
 	private void processCommand(Context context, String sender, String command,
 			String params, long time) {
-		if (command.equalsIgnoreCase("/bridge")) {
+		if (command.equalsIgnoreCase("bridge")) {
 			if (params.startsWith("#")) {
 				String[] splited = params.split(" ", 3);
 				String roomName = splited[0].substring(1);
 				POJORoom room = DBHelper.getRoom(context, roomName);
-				String routedSender = splited[1].split(":")[0];
-				String newNick = splited[1].split(":")[1];
-				DBHelper.ChangeContactNick(context, room.getId(), routedSender,
-						newNick);
-				processRoom(context, routedSender, roomName, splited[2], time);
+				if(room != null){
+					String routedSender = splited[1].split(":")[0];
+					String newNick = splited[1].split(":")[1];
+					DBHelper.ChangeContactNick(context, room.getId(), routedSender,
+							newNick);
+					processRoom(context, routedSender, roomName, splited[2], time);
+				}
 			} else if (params.startsWith("register")) {
 				String[] splited = params.split(" ", 2);
 				if (splited[0].startsWith("#")) {
@@ -70,51 +72,101 @@ public class SMSProcess extends BroadcastReceiver {
 					processUpdate(context, sender, splited[0].substring(1), contacts);
 				}
 			}
+		}else if(command.equalsIgnoreCase("join")){
+			if (params.startsWith("#")) {
+				String[] splited = params.split(" ", 2);
+				String smsRoomName = splited[0].substring(1);
+				processJoin(context, sender, smsRoomName, splited[1].split(" "));
+			}
 		}
 	}
+	
+	private void processJoin(Context context, String sender,
+			String smsRoomName, String[] params) {
+		
+		POJORoom room = DBHelper.getRoom(context, smsRoomName);
+		if(room != null){
+			POJOContact existing = DBHelper.getContact(context, room.getId(), sender);
+			if(existing != null){
+				//TODO notify user he is registered on another node
+			}else {
+				String nick = null;
+				boolean use_app = false;
+				if((params.length >= 3) && params[1].equalsIgnoreCase("as")){
+					nick = params[2];
+					if(params.length >= 4){
+						use_app = params[3].equalsIgnoreCase("true");
+					}
+				}else if(params.length == 2){
+					use_app = params[1].equalsIgnoreCase("true");
+				}
+				DBHelper.insertContact(context, room.getId(), sender, nick, null, use_app, false);
+				String nickSent = "";
+				if(nick != null){
+					nickSent = nick;
+				}
+				String infos = sender + ":" + "" + ":" + nickSent + ":" + Boolean.toString(use_app);
+				Iterator<POJOContact> it = DBHelper.getBridges(context,
+						room.getId()).iterator();
+				while (it.hasNext()) {
+					POJOContact bridge = (POJOContact) it.next();
+					SmsManager smsManager = SmsManager.getDefault();
+					String newBody = "/bridge update #" + room.name
+							+ " " + infos;
+					ArrayList<String> parts = smsManager
+							.divideMessage(newBody);
+					smsManager.sendMultipartTextMessage(bridge.number,
+							null, parts, null, null);
+				}
+			}
+		}
+	}
+	
 	
 	private void processUpdate(Context context, String sender,
 			String smsRoomName, String[] contacts) {
 
 		POJORoom room = DBHelper.getRoom(context, smsRoomName);
-		for (int i = 0; i < contacts.length; i++) {
-			String[] contactInfos = contacts[i].split(":");
-			POJOContact contact = DBHelper.getContact(context,
-					room.getId(), contactInfos[0]);
-			if (contactInfos[1].equalsIgnoreCase("bridge")) {
-				if (contact != null) {
-					contact.parentBridge = null;
-					contact.use_app = true;
-					contact.is_bridge = true;
-					DBHelper.updateContact(context, room.getId(), contact);
+		if(room != null){
+			for (int i = 0; i < contacts.length; i++) {
+				String[] contactInfos = contacts[i].split(":");
+				POJOContact contact = DBHelper.getContact(context,
+						room.getId(), contactInfos[0]);
+				if (contactInfos[1].equalsIgnoreCase("bridge")) {
+					if (contact != null) {
+						contact.parentBridge = null;
+						contact.use_app = true;
+						contact.is_bridge = true;
+						DBHelper.updateContact(context, room.getId(), contact);
+					} else {
+						String nick = null;
+						if(!contactInfos[2].equalsIgnoreCase("")){
+							nick = contactInfos[2];
+						}
+						DBHelper.insertContact(context, room.getId(),
+								contactInfos[0], nick, null,
+								contactInfos[3].equalsIgnoreCase("1"), true);
+					}
 				} else {
-					String nick = null;
-					if(!contactInfos[2].equalsIgnoreCase("")){
-						nick = contactInfos[2];
+					if (contact != null) {
+						String parent = sender;
+						if(!contactInfos[1].equalsIgnoreCase("")){
+							parent = contactInfos[1];
+						}
+						contact.parentBridge = parent;
+					} else {
+						String nick = null;
+						if(!contactInfos[2].equalsIgnoreCase("")){
+							nick = contactInfos[2];
+						}
+						String parentBridge = sender;
+						if(!contactInfos[1].equalsIgnoreCase("")){
+							parentBridge = contactInfos[1];
+						}
+						DBHelper.insertContact(context, room.getId(),
+								contactInfos[0], nick, parentBridge,
+								contactInfos[3].equalsIgnoreCase("true"), false);
 					}
-					DBHelper.insertContact(context, room.getId(),
-							contactInfos[0], nick, null,
-							contactInfos[3].equalsIgnoreCase("1"), true);
-				}
-			} else {
-				if (contact != null) {
-					String parent = sender;
-					if(!contactInfos[1].equalsIgnoreCase("")){
-						parent = contactInfos[1];
-					}
-					contact.parentBridge = parent;
-				} else {
-					String nick = null;
-					if(!contactInfos[2].equalsIgnoreCase("")){
-						nick = contactInfos[2];
-					}
-					String parentBridge = sender;
-					if(!contactInfos[1].equalsIgnoreCase("")){
-						parentBridge = contactInfos[1];
-					}
-					DBHelper.insertContact(context, room.getId(),
-							contactInfos[0], nick, parentBridge,
-							contactInfos[3].equalsIgnoreCase("true"), false);
 				}
 			}
 		}
@@ -124,82 +176,79 @@ public class SMSProcess extends BroadcastReceiver {
 			String smsRoomName, String[] contacts) {
 		
 		POJORoom room = DBHelper.getRoom(context, smsRoomName);
-		POJOContact newBridge = DBHelper.getContact(context, room.getId(),
-				sender);
-		newBridge.is_bridge = true;
-		newBridge.use_app = true;
-		newBridge.parentBridge = null;
-		DBHelper.updateContact(context, room.getId(), newBridge);
-		
-		processUpdate(context, sender, smsRoomName, contacts);
-		
-		ArrayList<POJOContact> contactsUpdated = DBHelper.getContacts(context, room.getId());
-		String infos = "";
-		for (POJOContact contactUpdated : contactsUpdated) {
-			String parentBridge = "";
-			if(!contactUpdated.is_bridge){
-				parentBridge = contactUpdated.parentBridge;
-			}else {
-				parentBridge = "bridge";
+		if(room != null){
+			POJOContact newBridge = DBHelper.getContact(context, room.getId(),
+					sender);
+			newBridge.is_bridge = true;
+			newBridge.use_app = true;
+			newBridge.parentBridge = null;
+			DBHelper.updateContact(context, room.getId(), newBridge);
+			
+			processUpdate(context, sender, smsRoomName, contacts);
+			
+			ArrayList<POJOContact> contactsUpdated = DBHelper.getContacts(context, room.getId());
+			String infos = "";
+			for (POJOContact contactUpdated : contactsUpdated) {
+				String parentBridge = "";
+				if(!contactUpdated.is_bridge){
+					parentBridge = contactUpdated.parentBridge;
+				}else {
+					parentBridge = "bridge";
+				}
+				String nick = "";
+				if(contactUpdated.nick != null){
+					nick = contactUpdated.nick;
+				}
+				infos += contactUpdated.number + ":" + parentBridge + ":" + nick + ":" + Boolean.toString(contactUpdated.use_app);
 			}
-			String nick = "";
-			if(contactUpdated.nick != null){
-				nick = contactUpdated.nick;
+			
+			Iterator<POJOContact> it = DBHelper.getBridges(context,
+					room.getId()).iterator();
+			while (it.hasNext()) {
+				POJOContact bridge = (POJOContact) it.next();
+				SmsManager smsManager = SmsManager.getDefault();
+				String newBody = "/bridge update #" + room.name
+						+ " " + infos;
+				ArrayList<String> parts = smsManager
+						.divideMessage(newBody);
+				smsManager.sendMultipartTextMessage(bridge.number,
+						null, parts, null, null);
 			}
-			infos += contactUpdated.number + ":" + parentBridge + ":" + nick + ":" + Boolean.toString(contactUpdated.use_app);
-		}
-		
-		Iterator<POJOContact> it = DBHelper.getBridges(context,
-				room.getId()).iterator();
-		while (it.hasNext()) {
-			POJOContact bridge = (POJOContact) it.next();
-			SmsManager smsManager = SmsManager.getDefault();
-			String newBody = "/bridge update #" + room.name
-					+ " " + infos;
-			ArrayList<String> parts = smsManager
-					.divideMessage(newBody);
-			smsManager.sendMultipartTextMessage(bridge.number,
-					null, parts, null, null);
 		}
 	}
 
 	private void processRoom(Context context, String sender,
 			String smsRoomName, String body, long time) {
-		boolean found = false;
-		ArrayList<POJORoom> rooms = DBHelper.getRooms(context);
-		Iterator<POJORoom> it = rooms.iterator();
-		while (it.hasNext() && !found) {
-			POJORoom room = it.next();
+		
+		POJORoom room = DBHelper.getRoom(context, smsRoomName);
+		if(room != null){
 			String nick = DBHelper
 					.getContactNick(context, sender, room.getId());
-
-			if (smsRoomName.equalsIgnoreCase(room.name)) {
-				found = true;
-				DBHelper.insertMessage(context, room.getId(), sender, body,
-						time);
-				if (room.is_bridge) {
-					for (POJOContact contact : DBHelper.getContactsToSend(
-							context, room.getId())) {
-						if (!PhoneNumberUtils.compare(sender, contact.number)) {
-							SmsManager smsManager = SmsManager.getDefault();
-							String newBody = "";
-							if (contact.is_bridge) {
-								newBody = "/bridge " + "#" + room.name + " "
-										+ sender + ":" + nick + " " + body;
+	
+			DBHelper.insertMessage(context, room.getId(), sender, body,
+					time);
+			if (room.is_bridge) {
+				for (POJOContact contact : DBHelper.getContactsToSend(
+						context, room.getId())) {
+					if (!PhoneNumberUtils.compare(sender, contact.number)) {
+						SmsManager smsManager = SmsManager.getDefault();
+						String newBody = "";
+						if (contact.is_bridge) {
+							newBody = "/bridge " + "#" + room.name + " "
+									+ sender + ":" + nick + " " + body;
+						} else {
+							newBody = "#" + room.name + "\n";
+							if (!contact.use_app && (nick != null)) {
+								newBody += nick + " : ";
 							} else {
-								newBody = "#" + room.name + "\n";
-								if (!contact.use_app && (nick != null)) {
-									newBody += nick + " : ";
-								} else {
-									newBody += contact.number + " : ";
-								}
-								newBody += body;
+								newBody += contact.number + " : ";
 							}
-							ArrayList<String> parts = smsManager
-									.divideMessage(newBody);
-							smsManager.sendMultipartTextMessage(contact.number,
-									null, parts, null, null);
+							newBody += body;
 						}
+						ArrayList<String> parts = smsManager
+								.divideMessage(newBody);
+						smsManager.sendMultipartTextMessage(contact.number,
+								null, parts, null, null);
 					}
 				}
 			}
