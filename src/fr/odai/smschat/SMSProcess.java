@@ -78,7 +78,25 @@ public class SMSProcess extends BroadcastReceiver {
 				String smsRoomName = splited[0].substring(1);
 				processJoin(context, sender, smsRoomName, splited[1].split(" "));
 			}
+		}else if(command.equalsIgnoreCase("list")){
+			processList(context, sender);
 		}
+	}
+	
+	private void processList(Context context, String sender){
+		String roomsInfo = "!listed";
+		ArrayList<POJORoom> rooms = DBHelper.getRooms(context);
+		for (POJORoom room : rooms) {
+			if(room.is_bridge){
+				roomsInfo += " #" + room.name;
+			}
+		}
+		
+		SmsManager smsManager = SmsManager.getDefault();
+		ArrayList<String> parts = smsManager
+				.divideMessage(roomsInfo);
+		smsManager.sendMultipartTextMessage(sender,
+				null, parts, null, null);
 	}
 	
 	private void processJoin(Context context, String sender,
@@ -118,6 +136,9 @@ public class SMSProcess extends BroadcastReceiver {
 					smsManager.sendMultipartTextMessage(bridge.number,
 							null, parts, null, null);
 				}
+				
+				//TODO notify the user he entered the room
+				
 			}
 		}
 	}
@@ -130,42 +151,44 @@ public class SMSProcess extends BroadcastReceiver {
 		if(room != null){
 			for (int i = 0; i < contacts.length; i++) {
 				String[] contactInfos = contacts[i].split(":");
-				POJOContact contact = DBHelper.getContact(context,
-						room.getId(), contactInfos[0]);
-				if (contactInfos[1].equalsIgnoreCase("bridge")) {
-					if (contact != null) {
-						contact.parentBridge = null;
-						contact.use_app = true;
-						contact.is_bridge = true;
-						DBHelper.updateContact(context, room.getId(), contact);
+				if(contactInfos.length > 3){
+					POJOContact contact = DBHelper.getContact(context,
+							room.getId(), contactInfos[0]);
+					if (contactInfos[1].equalsIgnoreCase("bridge")) {
+						if (contact != null) {
+							contact.parentBridge = null;
+							contact.use_app = true;
+							contact.is_bridge = true;
+							DBHelper.updateContact(context, room.getId(), contact);
+						} else {
+							String nick = null;
+							if(!contactInfos[2].equalsIgnoreCase("")){
+								nick = contactInfos[2];
+							}
+							DBHelper.insertContact(context, room.getId(),
+									contactInfos[0], nick, null,
+									contactInfos[3].equalsIgnoreCase("1"), true);
+						}
 					} else {
-						String nick = null;
-						if(!contactInfos[2].equalsIgnoreCase("")){
-							nick = contactInfos[2];
+						if (contact != null) {
+							String parent = sender;
+							if(!contactInfos[1].equalsIgnoreCase("")){
+								parent = contactInfos[1];
+							}
+							contact.parentBridge = parent;
+						} else {
+							String nick = null;
+							if(!contactInfos[2].equalsIgnoreCase("")){
+								nick = contactInfos[2];
+							}
+							String parentBridge = sender;
+							if(!contactInfos[1].equalsIgnoreCase("")){
+								parentBridge = contactInfos[1];
+							}
+							DBHelper.insertContact(context, room.getId(),
+									contactInfos[0], nick, parentBridge,
+									contactInfos[3].equalsIgnoreCase("true"), false);
 						}
-						DBHelper.insertContact(context, room.getId(),
-								contactInfos[0], nick, null,
-								contactInfos[3].equalsIgnoreCase("1"), true);
-					}
-				} else {
-					if (contact != null) {
-						String parent = sender;
-						if(!contactInfos[1].equalsIgnoreCase("")){
-							parent = contactInfos[1];
-						}
-						contact.parentBridge = parent;
-					} else {
-						String nick = null;
-						if(!contactInfos[2].equalsIgnoreCase("")){
-							nick = contactInfos[2];
-						}
-						String parentBridge = sender;
-						if(!contactInfos[1].equalsIgnoreCase("")){
-							parentBridge = contactInfos[1];
-						}
-						DBHelper.insertContact(context, room.getId(),
-								contactInfos[0], nick, parentBridge,
-								contactInfos[3].equalsIgnoreCase("true"), false);
 					}
 				}
 			}
@@ -199,7 +222,7 @@ public class SMSProcess extends BroadcastReceiver {
 				if(contactUpdated.nick != null){
 					nick = contactUpdated.nick;
 				}
-				infos += contactUpdated.number + ":" + parentBridge + ":" + nick + ":" + Boolean.toString(contactUpdated.use_app);
+				infos += contactUpdated.number + ":" + parentBridge + ":" + nick + ":" + Boolean.toString(contactUpdated.use_app) +";";
 			}
 			
 			Iterator<POJOContact> it = DBHelper.getBridges(context,
